@@ -192,6 +192,9 @@ class Register(object):
         elif dtype == REG_DTYPE.FLOAT:
             if storage:
                 self._reg.storage.flt = float(storage)
+
+            self._reg.range.min.flt = (range[0] if range else -2147483648)
+            self._reg.range.max.flt = (range[1] if range else 2147483647)
         else:
             self._reg.storage_valid = 0
 
@@ -339,6 +342,8 @@ class Register(object):
             return (self._reg.range.min.s64, self._reg.range.max.s64)
         elif self.dtype == REG_DTYPE.U64:
             return (self._reg.range.min.u64, self._reg.range.max.u64)
+        elif self.dtype == REG_DTYPE.FLOAT:
+            return (self._reg.range.min.flt, self._reg.range.max.flt)
 
         return None
 
