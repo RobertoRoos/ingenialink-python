@@ -1,7 +1,7 @@
 from enum import Enum
 
 from ._ingenialink import ffi, lib
-from ._utils import cstr, pstr, raise_null, raise_err, to_ms
+from ._utils import cstr, pstr, raise_null, raise_err, to_ms, exc
 from .registers import Register, REG_DTYPE, _get_reg_id, REG_ACCESS
 from .net import Network
 from .dict_ import Dictionary
@@ -445,7 +445,7 @@ class Servo(object):
             Args:
                 dict_f (str): Dictionary.
         """
-
+        self.dict.check_integrity(dict_f)
         r = lib.il_servo_dict_load(self._servo, cstr(dict_f))
         if not hasattr(self, '_errors') or not self._errors:
             self._errors = self._get_all_errors(dict_f)
@@ -463,6 +463,19 @@ class Servo(object):
 
         r = lib.il_servo_dict_storage_write(self._servo)
         raise_err(r)
+
+    def check_crc_status(self):
+        crc_status = 0
+        try:
+            crc_status = self.raw_read('DRV_CRC_STAT', subnode=0)
+            print("CRC_STATUS: {}".format(crc_status))
+        except Exception as e:
+            print("Failed to read the crc_status at subnode 0: {}".format(e))
+        for i in range(0, 4):
+            subnode_value = (crc_status >> (i*4)) & 0xF
+            if (subnode_value & (1 << 2)) == 4:
+                msg = "CRC failed at subnode {}".format(i)
+                raise exc.ILError(msg)
 
     @property
     def name(self):

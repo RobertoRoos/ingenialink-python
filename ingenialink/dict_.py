@@ -1,12 +1,15 @@
 import collections
 
 from ._ingenialink import ffi, lib
-from ._utils import cstr, pstr, raise_null, raise_err
+from ._utils import cstr, pstr, raise_null, raise_err, exc
 
 from .registers import Register, REG_DTYPE
 from .dict_labels import LabelsDictionary
 
+import io
+from xml.dom import minidom
 import xml.etree.ElementTree as ET
+from hashlib import md5
 
 
 class SubCategories(object):
@@ -186,6 +189,60 @@ class Dictionary(object):
 
         return inst
 
+    def add_integrity_check(self, filename):
+        tree = ET.parse(filename)
+        root = tree.getroot()
+
+        hash_node = root.find(".//Body/Device/Axes")
+        if hash_node is None:
+            hash_node = root.find(".//Body/Device/Registers")
+
+        hash_content = ET.tostring(hash_node).decode('utf-8')
+        new_element = ET.fromstring(hash_content)
+        registers = new_element.findall('Register')
+        if len(registers) == 0:
+            registers = new_element.findall(".//Axis/Registers/Register")
+        for register in registers:
+            register.attrib.pop('desc')
+        hash_content = ET.tostring(new_element).decode('utf-8')
+        hs_md5 = md5(hash_content.encode('utf-8')).hexdigest()
+        md5_node = ET.SubElement(root, 'MD5')
+        md5_node.text = hs_md5
+        md5_node.tail = "\n  "
+        root[-2].tail = "\n  "
+        root[-1].tail = "\n"
+
+        xmlstr = minidom.parseString(
+            ET.tostring(root)
+        ).toxml()
+        config_file = io.open(filename, "w", encoding='utf8')
+        config_file.write(xmlstr)
+        config_file.close()
+
+    def check_integrity(self, filename):
+        tree = ET.parse(filename)
+        root = tree.getroot()
+
+        md5_node = root.find(".//MD5")
+        if md5_node is not None:
+            hash_node = root.find(".//Body/Device/Axes")
+            if hash_node is None:
+                hash_node = root.find(".//Body/Device/Registers")
+
+            hash_content = ET.tostring(hash_node).decode('utf-8')
+            new_element = ET.fromstring(hash_content)
+            registers = new_element.findall('Register')
+            if len(registers) == 0:
+                registers = new_element.findall(".//Axis/Registers/Register")
+            for register in registers:
+                register.attrib.pop('desc')
+            hash_content = ET.tostring(new_element).decode('utf-8')
+            hs_md5 = md5(hash_content.encode('utf-8')).hexdigest()
+            md5_check = md5_node.text == hs_md5
+            if not md5_check:
+                msg = "MD5 integrity checksum failed"
+                raise exc.ILError(msg)
+
     def version_get(self, dict_):
         return lib.il_dict_version_get(dict_)
 
@@ -197,6 +254,8 @@ class Dictionary(object):
         """
 
         r = lib.il_dict_save(self._dict, cstr(fname))
+        if r >= 0:
+            self.add_integrity_check(fname)
         raise_err(r)
 
     def get_regs(self, subnode):
