@@ -206,6 +206,9 @@ class Dictionary(object):
             register.attrib.pop('desc')
         hash_content = ET.tostring(new_element).decode('utf-8')
         hs_md5 = md5(hash_content.encode('utf-8')).hexdigest()
+        previous_md5_node = root.find(".//MD5")
+        if previous_md5_node is not None:
+            root.remove(previous_md5_node)
         md5_node = ET.SubElement(root, 'MD5')
         md5_node.text = hs_md5
         md5_node.tail = "\n  "
