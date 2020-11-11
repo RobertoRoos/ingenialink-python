@@ -465,12 +465,10 @@ class Servo(object):
         raise_err(r)
 
     def check_crc_status(self):
-        crc_status = 0
         try:
             crc_status = self.raw_read('DRV_CRC_STAT', subnode=0)
-            print("CRC_STATUS: {}".format(crc_status))
-        except Exception as e:
-            print("Failed to read the crc_status at subnode 0: {}".format(e))
+        except:
+            raise exc.ILError("Failed reading the CRC status")
         for i in range(0, 4):
             subnode_value = (crc_status >> (i*4)) & 0xF
             if (subnode_value & (1 << 2)) == 4:
