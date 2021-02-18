@@ -9,6 +9,10 @@ dist/
 *.egg*
 .ipynb_checkpoints/
 
+# environments
+venv/
+venv*/
+
 # temp files
 _deps
 _install
